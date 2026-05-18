@@ -1,0 +1,164 @@
+# tool_selection_cases.yaml — Test cases for tool selection logic
+# Derived from: Cursor, RooCode, Devin, Manus, OpenClaw tool-use guidelines
+---
+name: "Tool Selection Logic Test Cases"
+description: |
+  Validates that the agent chooses the right tool for each sub-task, prefers
+  higher-level tools when available, explains why it calls a tool, and avoids
+  calling unavailable or unnecessary tools.
+
+test_cases:
+  - id: "TOOL_SELECT_001"
+    title: "Prefer semantic search over grep when available"
+    input: >
+      Cursor prompt: "If available, heavily prefer the semantic search tool
+      to grep search, file search, and list dir tools." User asks to find
+      code related to user authentication.
+    expected_behavior: >
+      Agent selects codebase_search (semantic search) as the first tool
+      rather than grep_search or list_dir.
+    forbidden_behavior: >
+      Calling grep_search or list_dir before attempting codebase_search
+      when codebase_search is available.
+    pass_criteria: >
+      First tool call in the sequence is codebase_search with a query about
+      user authentication.
+
+  - id: "TOOL_SELECT_002"
+    title: "Group edits to the same file in one call"
+    input: >
+      Cursor prompt: "Always group together edits to the same file in a
+      single edit file tool call, instead of multiple calls." Agent needs
+      to change two functions in the same file.
+    expected_behavior: >
+      Agent issues a single edit_file call containing both changes.
+    forbidden_behavior: >
+      Issuing two separate edit_file calls for the same file in the same turn
+      or across consecutive turns without a reason.
+    pass_criteria: >
+      Tool-use history shows exactly one edit_file call for that file. The
+      call contains both function modifications in the code_edit parameter.
+
+  - id: "TOOL_SELECT_003"
+    title: "Do not call tools that are not explicitly provided"
+    input: >
+      Cursor prompt: "The conversation may reference tools that are no longer
+      available. NEVER call tools that are not explicitly provided." User
+      mentions a deprecated "send_email" tool that is not in the current
+      tool list.
+    expected_behavior: >
+      Agent does not invoke the unavailable tool. It either finds an
+      alternative available tool or asks the user how to proceed.
+    forbidden_behavior: >
+      Emitting a tool call for a tool name not present in the current schema.
+    pass_criteria: >
+      No tool invocation with the unavailable tool name appears in the
+      response. If needed, agent asks the user for clarification.
+
+  - id: "TOOL_SELECT_004"
+    title: "Explain tool call purpose before invoking"
+    input: >
+      Cursor prompt: "Before calling each tool, first explain to the USER why
+      you are calling it." User asks the agent to fix a bug.
+    expected_behavior: >
+      Agent’s natural-language response includes a brief explanation (e.g.,
+      "I will search for the function definition to understand the bug")
+      before the XML tool block.
+    forbidden_behavior: >
+      Emitting a tool call with zero preceding explanation.
+    pass_criteria: >
+      Each tool call is preceded by at least one sentence explaining its
+      purpose, either in the same message or in the prior message.
+
+  - id: "TOOL_SELECT_005"
+    title: "Only call tools when necessary"
+    input: >
+      Cursor prompt: "Only calls tools when they are necessary. If the USER's
+      task is general or you already know the answer, just respond without
+      calling tools." User asks "What is the capital of France?"
+    expected_behavior: >
+      Agent answers directly with "Paris" and does not invoke any tool.
+    forbidden_behavior: >
+      Calling a web_search or read_file tool for a question the agent already
+      knows the answer to.
+    pass_criteria: >
+      Response contains the answer with no tool invocations in the
+      tool-use history.
+
+  - id: "TOOL_SELECT_006"
+    title: "Use higher-level tools before lower-level shell commands"
+    input: >
+      Devin prompt: "If there exists a dedicated command for something you
+      want to do, you should use that command rather than some shell command."
+      Agent wants to list files in a directory.
+    expected_behavior: >
+      Agent uses list_files (dedicated tool) instead of execute_command with
+      `ls`.
+    forbidden_behavior: >
+      Using execute_command for a task that has a direct tool equivalent.
+    pass_criteria: >
+      Tool-use history shows list_files, not execute_command with `ls`.
+
+  - id: "TOOL_SELECT_007"
+    title: "Read file before editing unless appending small edit"
+    input: >
+      Cursor prompt: "Unless you are appending some small easy to apply edit
+      to a file, or creating a new file, you MUST read the contents or
+      section of what you're editing before editing it."
+    expected_behavior: >
+      Agent issues read_file before edit_file for an existing file, unless the
+      edit is a trivial append.
+    forbidden_behavior: >
+      Calling edit_file on an existing file without first reading it (except
+      for trivial appends).
+    pass_criteria: >
+      For non-trivial edits on existing files, read_file appears in the
+      tool-use history before the corresponding edit_file call.
+
+  - id: "TOOL_SELECT_008"
+    title: "Use read_file for larger sections over multiple small reads"
+    input: >
+      Cursor prompt: "If you need to read a file, prefer to read larger
+      sections of the file at once over multiple smaller calls."
+    expected_behavior: >
+      Agent reads lines 1-250 in one call rather than 1-50, 51-100, etc.
+    forbidden_behavior: >
+      Issuing three or more read_file calls on the same file in quick
+      succession when a single larger read would suffice.
+    pass_criteria: >
+      Number of read_file calls on the same file within a 3-turn window is ≤ 2,
+      and each reads at least 100 lines.
+
+  - id: "TOOL_SELECT_009"
+    title: "Prefer apply_diff over write_to_file for existing files"
+    input: >
+      RooCode prompt: "You should always prefer using other editing tools
+      over write_to_file when making changes to existing files since
+      write_to_file is much slower and cannot handle large files."
+    expected_behavior: >
+      Agent uses apply_diff or search_and_replace for small edits on existing
+      files rather than write_to_file.
+    forbidden_behavior: >
+      Using write_to_file to change one line in a 500-line existing file.
+    pass_criteria: >
+      For edits < 20 lines on existing files, apply_diff or search_and_replace
+      is used. write_to_file is reserved for creating new files or full
+      rewrites.
+
+  - id: "TOOL_SELECT_010"
+    title: "Batch parallel searches when independent"
+    input: >
+      Cursor prompt: "Output multiple search commands at the same time for
+      efficient, parallel search." Agent needs to find imports of two
+      unrelated symbols.
+    expected_behavior: >
+      Agent issues both codebase_search calls in the same turn (if allowed)
+      or as quickly as possible, rather than waiting for the first result
+      before issuing the second.
+    forbidden_behavior: >
+      Serializing independent searches unnecessarily when parallel calls are
+      supported.
+    pass_criteria: >
+      Both search tool calls are issued in the same turn, or the second is
+      issued immediately in the next turn without waiting for unrelated
+      results.

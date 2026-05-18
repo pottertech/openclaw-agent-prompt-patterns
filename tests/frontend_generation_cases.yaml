@@ -1,0 +1,144 @@
+# frontend_generation_cases.yaml — Test cases for frontend code generation
+# Derived from: v0, Lovable, Replit, Cursor, RooCode frontend policies
+---
+name: "Frontend Generation Test Cases"
+description: |
+  Validates framework defaults, component size limits, styling conventions,
+  accessibility, asset handling, and build/deployment rules.
+
+test_cases:
+  - id: "FE_001"
+    title: "Default to Next.js App Router unless specified otherwise"
+    input: >
+      User asks: "Create a new React project for a blog." No framework is
+      specified.
+    expected_behavior: >
+      Agent initializes a Next.js project with App Router (e.g., `npx
+      create-next-app@latest --app`).
+    forbidden_behavior: >
+      Defaulting to Create React App, plain Vite, or another framework
+      without asking the user.
+    pass_criteria: >
+      Project scaffold includes `app/` directory and `next.config.js` (or
+      `next.config.ts`).
+
+  - id: "FE_002"
+    title: "Create small, focused components (≤ 50 lines)"
+    input: >
+      User asks for a login form with email, password, submit button, and
+      error display.
+    expected_behavior: >
+      Agent splits the form into small components: `login-form.tsx`,
+      `email-input.tsx`, `password-input.tsx`, etc., each roughly ≤ 50 lines.
+    forbidden_behavior: >
+      Dumping all JSX, logic, and styling into a single 200-line component
+      file.
+    pass_criteria: >
+      No single component file exceeds 50 lines of non-comment, non-import
+      code.
+
+  - id: "FE_003"
+    title: "New component = new file"
+    input: >
+      User asks to add a `Navbar` component to an existing Next.js project.
+    expected_behavior: >
+      Agent creates a new file `app/components/navbar.tsx` (or similar) for
+      the Navbar.
+    forbidden_behavior: >
+      Appending the Navbar JSX to an existing unrelated file (e.g.,
+      `app/page.tsx`).
+    pass_criteria: >
+      New component exists in its own file; no unrelated file was modified
+      to host the new component.
+
+  - id: "FE_004"
+    title: "Use Tailwind CSS for styling by default"
+    input: >
+      User asks for a styled card component. No styling preference is given.
+    expected_behavior: >
+      Agent uses Tailwind utility classes (e.g., `className="rounded-lg
+      shadow-md p-4"`).
+    forbidden_behavior: >
+      Using inline styles, CSS modules, or styled-components without user
+      request or project convention.
+    pass_criteria: >
+      Component uses Tailwind classes; no inline style attributes.
+
+  - id: "FE_005"
+    title: "Generate responsive designs by default"
+    input: >
+      User asks for a landing page hero section.
+    expected_behavior: >
+      Agent includes responsive breakpoints (e.g., `md:`, `lg:`) so the layout
+      adapts to mobile and desktop.
+    forbidden_behavior: >
+      Generating a desktop-only layout with fixed widths and no responsive
+      modifiers.
+    pass_criteria: >
+      At least one responsive Tailwind breakpoint class is present in the
+      generated code.
+
+  - id: "FE_006"
+    title: "Include accessibility basics (alt text, ARIA, semantic HTML)"
+    input: >
+      User asks for an image gallery component.
+    expected_behavior: >
+      Agent includes `alt` attributes on images, semantic tags (`<article>`,
+      `<figure>`), and ARIA labels where needed.
+    forbidden_behavior: >
+      Using `<div>` soup with no alt text or ARIA roles.
+    pass_criteria: >
+      All `<img>` tags have `alt` props. Semantic HTML is used where
+      appropriate.
+
+  - id: "FE_007"
+    title: "Use icon libraries instead of inline SVGs"
+    input: >
+      User asks for a settings page with various icons.
+    expected_behavior: >
+      Agent imports icons from a library like `lucide-react` rather than
+      embedding raw SVG markup.
+    forbidden_behavior: >
+      Pasting inline SVG markup for every icon.
+    pass_criteria: >
+      Icons are imported from a library and used as components (e.g.,
+      `import { Settings } from "lucide-react"`).
+
+  - id: "FE_008"
+    title: "Do not output framework config files unless needed"
+    input: >
+      User asks to create a simple About page inside an existing Next.js
+      project.
+    expected_behavior: >
+      Agent creates the page file only. It does not modify `next.config.js`
+      or add unnecessary config.
+    forbidden_behavior: >
+      Rewriting `next.config.js` or creating `tailwind.config.ts` when the
+      project already has them.
+    pass_criteria: >
+      Only the page/component file is created; no unnecessary config changes.
+
+  - id: "FE_009"
+    title: "Listen on 0.0.0.0 for accessible port bindings"
+    input: >
+      Agent runs a local dev server for the user to preview.
+    expected_behavior: >
+      Agent starts the server with host `0.0.0.0` (e.g., `npm run dev
+      -- --hostname 0.0.0.0`).
+    forbidden_behavior: >
+      Binding to `localhost` or `127.0.0.1` only, which prevents external
+      preview.
+    pass_criteria: >
+      Dev server listens on `0.0.0.0` or `::`.
+
+  - id: "FE_010"
+    title: "Use import type for type-only imports"
+    input: >
+      Agent imports a TypeScript interface `UserProfile` from another file.
+    expected_behavior: >
+      Agent writes `import type { UserProfile } from "./types"` to avoid
+      runtime imports.
+    forbidden_behavior: >
+      Using `import { UserProfile }` when the import is only used for types.
+    pass_criteria: >
+      Type-only imports use `import type` syntax.

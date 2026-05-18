@@ -1,0 +1,764 @@
+{
+  "policies": [
+    {
+      "file": "agent_loop_policy.md",
+      "title": "Agent Loop Policy",
+      "purpose": "Define the behavior of the agent's execution loop, including terminal states, retry limits, and how the agent progresses through tasks using the Karpathy Loop.",
+      "rules": [
+        {
+          "id": "agent_loop_policy_001",
+          "title": "Loop Structure (The Karpathy Loop)",
+          "description": "The agent operates in an iterative loop with these phases:\n1. **Observe**: Ingest the latest user message, tool results, and state changes.\n2. **Orient**: Understand the current state relative to the task goal.\n3. **Decide**: Select the next action (tool call, response, or termination).\n4. **Act**: Execute the chosen action.\n5. **Repeat** until the task is complete or a terminal state is reached."
+        },
+        {
+          "id": "agent_loop_policy_002",
+          "title": "One Tool Per Iteration",
+          "description": "- Only **one tool call** per reasoning cycle.\n- The agent must wait for the tool's result before proceeding to the next iteration.\n- Patience is required; the loop continues until completion."
+        },
+        {
+          "id": "agent_loop_policy_003",
+          "title": "Terminal States",
+          "description": "The loop may terminate in one of the following states:\n- **Success**: The task is completed and results are delivered.\n- **Idle/Standby**: The agent enters a waiting state for new tasks.\n- **Error**: A critical failure occurs that prevents continuation.\n- **User Stop**: The user explicitly requests termination."
+        },
+        {
+          "id": "agent_loop_policy_004",
+          "title": "Retry and Error Handling",
+          "description": "- On tool failure, first verify the tool name and arguments.\n- Attempt to fix issues based on the error message.\n- If multiple approaches fail, report failure reasons and ask for user assistance.\n- Retry limits apply to prevent infinite loops:\n  - **Tool errors**: Up to 3 retries with modified arguments.\n  - **Plan deviations**: Up to 2 replanning attempts before escalating."
+        },
+        {
+          "id": "agent_loop_policy_005",
+          "title": "Progress Tracking",
+          "description": "- Maintain an internal understanding of the current step number and status.\n- Update markers immediately after completing each item.\n- Rebuild the plan when the overall task objective changes significantly."
+        },
+        {
+          "id": "agent_loop_policy_006",
+          "title": "State Transitions",
+          "description": "- The agent transitions between states based on events:\n  - `active` \u2192 `waiting_for_tool`: After dispatching a tool call.\n  - `waiting_for_tool` \u2192 `active`: Upon receiving tool results.\n  - `active` \u2192 `idle`: When all tasks are completed.\n  - `active` \u2192 `error`: On critical failure."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Medium Risk",
+          "description": "Incorrect loop state transitions can lead to stale decisions."
+        },
+        {
+          "level": "Low Risk",
+          "description": "Retry limits prevent runaway loops but may cause premature failure."
+        }
+      ],
+      "references": [
+        "OpenClaw \"Karpathy Loop\" concept"
+      ]
+    },
+    {
+      "file": "coding_agent_policy.md",
+      "title": "Coding Agent Policy",
+      "purpose": "Define patterns for code editing, reading, and writing that minimize errors and preserve code quality.",
+      "rules": [
+        {
+          "id": "coding_agent_policy_001",
+          "title": "Read Before Edit",
+          "description": "- **Always read a file before editing it.** Never modify code without understanding its full context.\n- When reading large files, prefer reading specific line ranges over loading the entire file into context.\n- Use semantic search to find relevant code sections when the exact location is unknown."
+        },
+        {
+          "id": "coding_agent_policy_002",
+          "title": "Minimal Changes",
+          "description": "- Complete tasks with the **minimal code changes** necessary.\n- Focus on maintainability and readability.\n- Preserve existing code style, conventions, and patterns."
+        },
+        {
+          "id": "coding_agent_policy_003",
+          "title": "Context Awareness",
+          "description": "- Before making changes, examine surrounding context, especially imports, to understand framework choices.\n- When creating new components, first look at existing components to understand naming conventions and typing.\n- Never assume a library is available; verify it exists in the project before using it."
+        },
+        {
+          "id": "coding_agent_policy_004",
+          "title": "Batch Edits",
+          "description": "- When multiple changes are needed in the **same file**, batch them into a single edit operation.\n- Group edits that affect the same block or nearby lines.\n- Use atomic replacement for file edits to prevent partial updates."
+        },
+        {
+          "id": "coding_agent_policy_005",
+          "title": "Code Quality",
+          "description": "- Do not add comments that simply restate what the code does.\n- Only add comments when the code is complex and requires additional context.\n- Follow the project's existing linting and formatting rules.\n- Fix linter errors if clear how to, but do not make uneducated guesses."
+        },
+        {
+          "id": "coding_agent_policy_006",
+          "title": "Testing",
+          "description": "- When provided with test commands, run them before submitting changes.\n- Never modify test code unless explicitly asked.\n- If tests fail, assume the issue is in the code under test before suspecting the tests."
+        },
+        {
+          "id": "coding_agent_policy_007",
+          "title": "No Shell for File Operations",
+          "description": "- Use file editing tools for creating, viewing, and editing files.\n- Never use shell commands (`cat`, `sed`, `echo`, `vim`) for file manipulation."
+        }
+      ],
+      "risks": [
+        {
+          "level": "High Risk",
+          "description": "Editing files without reading them first can corrupt code."
+        },
+        {
+          "level": "Medium Risk",
+          "description": "Batching too many changes increases the chance of syntax errors."
+        }
+      ],
+      "references": [
+        "OpenClaw `edit` tool guidelines"
+      ]
+    },
+    {
+      "file": "database_safety_policy.md",
+      "title": "Database Safety Policy",
+      "purpose": "Define safe patterns for database access, including destructive action prevention and data integrity rules.",
+      "rules": [
+        {
+          "id": "database_safety_policy_001",
+          "title": "Read-Only by Default",
+          "description": "- Database queries default to read-only operations.\n- Write operations require explicit user confirmation or are gated by approval."
+        },
+        {
+          "id": "database_safety_policy_002",
+          "title": "Destructive Action Prevention",
+          "description": "- Never execute `DELETE`, `UPDATE`, `DROP`, or `TRUNCATE` without explicit user approval.\n- Migrations must be performed through ORM tools (e.g., Drizzle, Flask-Migrate), not raw SQL.\n- Do not alter database tables unless explicitly requested."
+        },
+        {
+          "id": "database_safety_policy_003",
+          "title": "Query Safety",
+          "description": "- Use parameterized queries to prevent SQL injection.\n- Validate inputs before using them in database queries.\n- Prefer ORM abstractions over raw SQL for standard operations."
+        },
+        {
+          "id": "database_safety_policy_004",
+          "title": "Connection Management",
+          "description": "- Use connection pooling to manage database connections efficiently.\n- Close connections after use to prevent resource leaks.\n- Never expose database credentials in logs or error messages."
+        },
+        {
+          "id": "database_safety_policy_005",
+          "title": "Data Integrity",
+          "description": "- Ensure transactions are used for multi-step write operations.\n- Rollback on error to maintain data consistency.\n- Verify schema compatibility before running queries."
+        },
+        {
+          "id": "database_safety_policy_006",
+          "title": "SQL Tool Usage",
+          "description": "- Use dedicated SQL execution tools for database interactions instead of shell commands.\n- Use the SQL tool for fixing database errors, exploring schemas, and running ad-hoc queries.\n- Do not use the SQL tool for migrations; use ORM migration tools instead."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Critical Risk",
+          "description": "Unauthorized destructive actions can cause irreversible data loss."
+        },
+        {
+          "level": "High Risk",
+          "description": "SQL injection can compromise the entire database."
+        }
+      ],
+      "references": [
+        "OpenClaw database tool guidelines"
+      ]
+    },
+    {
+      "file": "destructive_action_policy.md",
+      "title": "Destructive Action Policy",
+      "purpose": "Define what constitutes a destructive action, when approval is required, and how to handle dangerous operations.",
+      "rules": [
+        {
+          "id": "destructive_action_policy_001",
+          "title": "Destructive Operations Definition",
+          "description": "The following are considered destructive:\n- File deletion (`rm`, `trash` on critical files)\n- Database `DELETE`, `UPDATE`, `DROP`, `TRUNCATE`\n- Overwriting existing files without backup\n- Modifying configuration files that affect system behavior\n- External communications (emails, posts, API calls)\n- Destructive shell commands (e.g., `dd`, `mkfs`)"
+        },
+        {
+          "id": "destructive_action_policy_002",
+          "title": "Approval Requirements",
+          "description": "- Destructive actions require explicit user approval.\n- The agent must describe the action and its consequences before requesting approval.\n- Approval mechanisms must not be bypassed."
+        },
+        {
+          "id": "destructive_action_policy_003",
+          "title": "Safety Defaults",
+          "description": "- Prefer `trash` over `rm` for file deletion (recoverable).\n- Always backup files before overwriting.\n- Use dry-run modes when available to preview changes."
+        },
+        {
+          "id": "destructive_action_policy_004",
+          "title": "External Actions",
+          "description": "- Sending emails, tweets, or public posts requires user approval.\n- Never send half-baked replies to messaging surfaces.\n- Be careful in group chats; you are a participant, not a proxy."
+        },
+        {
+          "id": "destructive_action_policy_005",
+          "title": "Rollback",
+          "description": "- When possible, provide a way to undo destructive actions.\n- Document changes so they can be reversed if needed.\n- If a rollback mechanism exists, inform the user."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Critical Risk",
+          "description": "Unauthorized destructive actions can cause irreversible damage."
+        },
+        {
+          "level": "High Risk",
+          "description": "Accidental data loss from unapproved deletions."
+        }
+      ],
+      "references": [
+        "OpenClaw destructive action guidelines"
+      ]
+    },
+    {
+      "file": "edit_policy.md",
+      "title": "Edit Policy",
+      "purpose": "Define rules for file editing operations, including batching, atomicity, and safe modification practices.",
+      "rules": [
+        {
+          "id": "edit_policy_001",
+          "title": "Read Before Writing",
+          "description": "- Always read the current contents of a file before modifying it.\n- For large files, read specific line ranges to avoid context overflow.\n- Understand the file's structure and conventions before making changes."
+        },
+        {
+          "id": "edit_policy_002",
+          "title": "Exact Text Matching",
+          "description": "- Edits must match the exact text in the file, including whitespace and indentation.\n- Use unique, non-overlapping regions for replacements.\n- If two changes affect the same block, merge them into a single edit."
+        },
+        {
+          "id": "edit_policy_003",
+          "title": "Atomicity",
+          "description": "- File writes are atomic \u2014 the entire file is replaced.\n- For partial edits, use exact replacement to ensure consistency.\n- Never leave files in a partially edited state."
+        },
+        {
+          "id": "edit_policy_004",
+          "title": "Batching Rules",
+          "description": "- Batch multiple edits to the **same file** into a single operation.\n- Do not batch edits to **different files** in the same operation if the tool does not support it.\n- Prefer surgical edits (replacing specific lines) over full-file rewrites when possible."
+        },
+        {
+          "id": "edit_policy_005",
+          "title": "Creation and Deletion",
+          "description": "- When creating new files, provide the complete intended content.\n- When deleting files, verify the file is not referenced elsewhere.\n- Use `trash` over `rm` for recoverable deletion."
+        },
+        {
+          "id": "edit_policy_006",
+          "title": "Verification",
+          "description": "- After editing, verify the file was modified correctly.\n- Check for syntax errors if the file is code.\n- Re-read the modified section if unsure about the result."
+        }
+      ],
+      "risks": [
+        {
+          "level": "High Risk",
+          "description": "Overlapping edits can corrupt files."
+        },
+        {
+          "level": "Medium Risk",
+          "description": "Full-file rewrites can accidentally remove content."
+        }
+      ],
+      "references": [
+        "OpenClaw `edit` tool documentation",
+        "File system safety guidelines"
+      ]
+    },
+    {
+      "file": "evidence_logging_policy.md",
+      "title": "Evidence Logging Policy",
+      "purpose": "Define how the agent maintains audit trails, logs actions, and preserves evidence of work.",
+      "rules": [
+        {
+          "id": "evidence_logging_policy_001",
+          "title": "Audit Trail",
+          "description": "- Log all significant actions taken by the agent.\n- Include timestamps, action types, and outcomes.\n- Maintain the audit trail in a durable, append-only format."
+        },
+        {
+          "id": "evidence_logging_policy_002",
+          "title": "WAL (Write-Ahead Logging)",
+          "description": "- Before executing destructive actions, log the intent.\n- Log the result of the action after execution.\n- This ensures that actions can be replayed or audited later."
+        },
+        {
+          "id": "evidence_logging_policy_003",
+          "title": "Tool Result Logging",
+          "description": "- Save intermediate results to files when they are too large for context.\n- Store different types of reference information in separate files.\n- Log tool outputs for debugging and verification."
+        },
+        {
+          "id": "evidence_logging_policy_004",
+          "title": "User Communication Logging",
+          "description": "- Log user messages and agent responses for continuity.\n- Do not log sensitive information (secrets, credentials).\n- Respect user privacy in all logs."
+        },
+        {
+          "id": "evidence_logging_policy_005",
+          "title": "Evidence Preservation",
+          "description": "- Preserve evidence of completed work (files, outputs, screenshots).\n- Make deliverables available as attachments when possible.\n- Ensure logs are readable and useful for debugging."
+        },
+        {
+          "id": "evidence_logging_policy_006",
+          "title": "Log Rotation",
+          "description": "- Rotate logs to prevent unbounded growth.\n- Retain logs for a reasonable period (e.g., 30 days).\n- Archive old logs if they need to be kept longer."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Low Risk",
+          "description": "Excessive logging can consume resources."
+        },
+        {
+          "level": "Medium Risk",
+          "description": "Missing logs can make debugging difficult."
+        }
+      ],
+      "references": [
+        "OpenClaw logging guidelines"
+      ]
+    },
+    {
+      "file": "frontend_generation_policy.md",
+      "title": "Frontend Generation Policy",
+      "purpose": "Define patterns for generating frontend code, including build patterns, component rules, and styling guidelines.",
+      "rules": [
+        {
+          "id": "frontend_generation_policy_001",
+          "title": "Framework Defaults",
+          "description": "- Default to modern frameworks (e.g., Next.js App Router) unless specified otherwise.\n- Prioritize Server Components for React/Next.js when possible.\n- Use the latest stable versions of frameworks and libraries."
+        },
+        {
+          "id": "frontend_generation_policy_002",
+          "title": "Component Rules",
+          "description": "- Create small, focused components (aim for 50 lines or less).\n- Create a new file for every new component or hook.\n- Never add new components to existing files, even if they seem related.\n- Use kebab-case for file names (e.g., `login-form.tsx`)."
+        },
+        {
+          "id": "frontend_generation_policy_003",
+          "title": "Styling",
+          "description": "- Use Tailwind CSS for styling unless the user specifies otherwise.\n- Avoid hardcoding colors; use CSS variables or Tailwind's built-in color system.\n- Generate responsive designs by default.\n- Implement accessibility best practices (semantic HTML, ARIA roles, alt text)."
+        },
+        {
+          "id": "frontend_generation_policy_004",
+          "title": "Asset Handling",
+          "description": "- Use placeholder images via standard placeholder services.\n- Use icon libraries (e.g., Lucide React) instead of inline SVGs.\n- Set `crossOrigin=\"anonymous\"` for images rendered on `<canvas>`."
+        },
+        {
+          "id": "frontend_generation_policy_005",
+          "title": "Code Quality",
+          "description": "- Use `import type` for type imports to avoid runtime imports.\n- Provide default props for React components.\n- Use ES6+ syntax; avoid `require` in favor of `import`."
+        },
+        {
+          "id": "frontend_generation_policy_006",
+          "title": "Build and Deploy",
+          "description": "- Do not output framework config files (e.g., `next.config.js`) unless explicitly needed.\n- Listen on `0.0.0.0` for accessible port bindings, not `localhost`.\n- Test locally before deploying."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Medium Risk",
+          "description": "Incorrect framework defaults can cause compatibility issues."
+        },
+        {
+          "level": "Low Risk",
+          "description": "Accessibility oversights can impact user experience."
+        }
+      ],
+      "references": [
+        "OpenClaw frontend generation guidelines"
+      ]
+    },
+    {
+      "file": "progress_reporting_policy.md",
+      "title": "Progress Reporting Policy",
+      "purpose": "Define how the agent reports status, updates, and evidence of work to the user.",
+      "rules": [
+        {
+          "id": "progress_reporting_policy_001",
+          "title": "Status Updates",
+          "description": "- Provide brief progress updates during long-running tasks.\n- Use non-blocking notifications for status updates.\n- Reserve blocking questions (requiring user reply) for essential needs only."
+        },
+        {
+          "id": "progress_reporting_policy_002",
+          "title": "Evidence Logging",
+          "description": "- Log completed steps and key decisions.\n- Provide deliverables and related files as attachments when possible.\n- Summarize recent changes concisely before asking for user feedback."
+        },
+        {
+          "id": "progress_reporting_policy_003",
+          "title": "Completion Reporting",
+          "description": "- When a task is complete, report the result clearly and concisely.\n- Do not end completion messages with questions or offers for further assistance unless asked.\n- Provide a final summary of what was accomplished."
+        },
+        {
+          "id": "progress_reporting_policy_004",
+          "title": "Error Reporting",
+          "description": "- When errors occur, explain the problem clearly.\n- Describe what was attempted and why it failed.\n- Provide actionable next steps or ask for user assistance if stuck."
+        },
+        {
+          "id": "progress_reporting_policy_005",
+          "title": "User Communication Style",
+          "description": "- Speak in simple, everyday language unless the user prefers technical terms.\n- Respond in the same language as the user's message.\n- Avoid unnecessary conversational filler; be direct and to the point."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Low Risk",
+          "description": "Over-reporting can be annoying; under-reporting can leave users confused."
+        }
+      ],
+      "references": [
+        "OpenClaw messaging guidelines"
+      ]
+    },
+    {
+      "file": "rollback_policy.md",
+      "title": "Rollback Policy",
+      "purpose": "Define how the agent handles reversion, recovery, and undo behavior for file changes and actions.",
+      "rules": [
+        {
+          "id": "rollback_policy_001",
+          "title": "Undo Capability",
+          "description": "- The agent must support undoing the last edit made to a file.\n- Use the undo tool to revert changes when available.\n- Document changes so they can be manually reversed if needed."
+        },
+        {
+          "id": "rollback_policy_002",
+          "title": "Recovery from Errors",
+          "description": "- If an edit corrupts a file, immediately revert the change.\n- If a tool execution fails, attempt to recover gracefully.\n- When multiple approaches fail, report the failure and ask for user assistance."
+        },
+        {
+          "id": "rollback_policy_003",
+          "title": "Version Control",
+          "description": "- Use git for version control when available.\n- Make commits with clear messages after significant changes.\n- Never force push; ask the user for help if push fails."
+        },
+        {
+          "id": "rollback_policy_004",
+          "title": "State Recovery",
+          "description": "- The agent must recover from crashes or interruptions.\n- On restart, read the current state to understand what has been done.\n- Rebuild the plan if the task objective has changed."
+        },
+        {
+          "id": "rollback_policy_005",
+          "title": "User-Initiated Rollback",
+          "description": "- If the user requests a rollback, comply immediately.\n- Use the project's rollback mechanisms (e.g., git revert, undo_edit).\n- Confirm the rollback was successful."
+        }
+      ],
+      "risks": [
+        {
+          "level": "High Risk",
+          "description": "Inability to rollback can lead to permanent data loss."
+        },
+        {
+          "level": "Medium Risk",
+          "description": "Incorrect rollback can revert wanted changes."
+        }
+      ],
+      "references": [
+        "OpenClaw rollback and recovery guidelines"
+      ]
+    },
+    {
+      "file": "secret_handling_policy.md",
+      "title": "Secret Handling Policy",
+      "purpose": "Define how secrets, credentials, and sensitive data are managed and protected.",
+      "rules": [
+        {
+          "id": "secret_handling_policy_001",
+          "title": "Secret Isolation",
+          "description": "- Secrets must never be hardcoded in source code.\n- Use environment variables or secret management tools for all credentials.\n- Keep secrets out of logs, error messages, and user-facing output."
+        },
+        {
+          "id": "secret_handling_policy_002",
+          "title": "Credential Access",
+          "description": "- The agent can access secrets provided by the user through secure channels.\n- Use the `list_secrets` tool to discover available secrets.\n- Never reveal secrets in tool arguments that might be logged."
+        },
+        {
+          "id": "secret_handling_policy_003",
+          "title": "Communication Security",
+          "description": "- Never share sensitive data with third parties.\n- Obtain explicit user permission before external communications.\n- Use secure channels for any credential exchange."
+        },
+        {
+          "id": "secret_handling_policy_004",
+          "title": "Storage",
+          "description": "- Do not commit secrets to version control.\n- Use `.env` files or secret management services for local development.\n- Rotate secrets regularly and avoid reuse across environments."
+        },
+        {
+          "id": "secret_handling_policy_005",
+          "title": "Exposure Prevention",
+          "description": "- If a secret is accidentally exposed, immediately notify the user.\n- Redact secrets from any output, including debug logs.\n- Treat code and customer data as sensitive information."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Critical Risk",
+          "description": "Secret exposure can lead to unauthorized access and data breaches."
+        },
+        {
+          "level": "High Risk",
+          "description": "Accidental logging of secrets in tool calls or errors."
+        }
+      ],
+      "references": [
+        "OpenClaw secret management guidelines"
+      ]
+    },
+    {
+      "file": "tool_use_policy.md",
+      "title": "Tool Use Policy",
+      "purpose": "Define rules for tool selection, capability gating, and how tool schemas are exposed to the agent.",
+      "rules": [
+        {
+          "id": "tool_use_policy_001",
+          "title": "Schema Exposure",
+          "description": "- The agent only uses tools that are explicitly provided in the current context.\n- Tool schemas, descriptions, and parameters are exposed to the agent as structured metadata.\n- The agent must carefully verify available tools and must not fabricate non-existent tools."
+        },
+        {
+          "id": "tool_use_policy_002",
+          "title": "Tool Selection",
+          "description": "- Choose the most appropriate tool based on the task and tool descriptions.\n- When multiple actions are needed, use one tool at a time, with each tool use informed by the previous result.\n- Do not assume the outcome of any tool use. Each step must be informed by the actual result."
+        },
+        {
+          "id": "tool_use_policy_003",
+          "title": "Capability Gating",
+          "description": "- Some tools require user approval before execution.\n- Dangerous tools (e.g., destructive file operations, external communications) are gated.\n- The agent must not bypass approval mechanisms."
+        },
+        {
+          "id": "tool_use_policy_004",
+          "title": "One Tool Per Turn",
+          "description": "- Only one tool call per message/turn.\n- Wait for the result before proceeding to the next tool call.\n- This prevents race conditions and ensures decisions are based on current state."
+        },
+        {
+          "id": "tool_use_policy_005",
+          "title": "Tool Output Handling",
+          "description": "- Tool results are provided in the next user message.\n- The agent must process these results before deciding the next action.\n- If a tool fails, handle the error gracefully according to the error handling policy."
+        },
+        {
+          "id": "tool_use_policy_006",
+          "title": "No Tool Name Mentions",
+          "description": "- Do not mention specific tool names when communicating with the user.\n- Describe what you are doing in plain language, not tool call syntax."
+        }
+      ],
+      "risks": [
+        {
+          "level": "High Risk",
+          "description": "Fabricating tool calls that don't exist causes execution failures."
+        },
+        {
+          "level": "Medium Risk",
+          "description": "Using the wrong tool for a task can produce incorrect results."
+        }
+      ],
+      "references": [
+        "OpenClaw tool registry"
+      ]
+    },
+    {
+      "file": "verification_policy.md",
+      "title": "Verification Policy",
+      "purpose": "Define rules for testing, linting, and validating code and actions before completion.",
+      "rules": [
+        {
+          "id": "verification_policy_001",
+          "title": "Testing",
+          "description": "- Run tests before marking a task as complete.\n- Never modify test code unless explicitly asked.\n- If tests fail, investigate the code under test before suspecting the tests.\n- Use the test commands provided in the project (e.g., `npm test`, `pytest`)."
+        },
+        {
+          "id": "verification_policy_002",
+          "title": "Linting",
+          "description": "- Run linters before submitting code changes.\n- Fix linter errors if the fix is clear and straightforward.\n- Do not make uneducated guesses to fix linter errors.\n- If linter errors persist after 3 attempts, stop and ask the user."
+        },
+        {
+          "id": "verification_policy_003",
+          "title": "Validation",
+          "description": "- Verify that code compiles or runs without errors.\n- Check that the output matches the expected behavior.\n- For web apps, test locally before deploying."
+        },
+        {
+          "id": "verification_policy_004",
+          "title": "Review",
+          "description": "- Before completing a task, review all changes made.\n- Ensure all relevant files were updated.\n- Verify no unintended side effects were introduced."
+        },
+        {
+          "id": "verification_policy_005",
+          "title": "CI/CD",
+          "description": "- If CI checks exist, ensure they pass before considering the task complete.\n- If CI fails, investigate and fix the root cause.\n- Ask for user help if CI does not pass after the third attempt."
+        }
+      ],
+      "risks": [
+        {
+          "level": "Medium Risk",
+          "description": "Skipping verification can lead to broken code in production."
+        },
+        {
+          "level": "Low Risk",
+          "description": "Over-reliance on automated checks may miss logical errors."
+        }
+      ],
+      "references": [
+        "OpenClaw verification guidelines"
+      ]
+    }
+  ],
+  "by_risk": {
+    "Medium Risk": [
+      {
+        "policy": "agent_loop_policy.md",
+        "rule_title": "Agent Loop Policy",
+        "description": "Incorrect loop state transitions can lead to stale decisions."
+      },
+      {
+        "policy": "coding_agent_policy.md",
+        "rule_title": "Coding Agent Policy",
+        "description": "Batching too many changes increases the chance of syntax errors."
+      },
+      {
+        "policy": "edit_policy.md",
+        "rule_title": "Edit Policy",
+        "description": "Full-file rewrites can accidentally remove content."
+      },
+      {
+        "policy": "evidence_logging_policy.md",
+        "rule_title": "Evidence Logging Policy",
+        "description": "Missing logs can make debugging difficult."
+      },
+      {
+        "policy": "frontend_generation_policy.md",
+        "rule_title": "Frontend Generation Policy",
+        "description": "Incorrect framework defaults can cause compatibility issues."
+      },
+      {
+        "policy": "rollback_policy.md",
+        "rule_title": "Rollback Policy",
+        "description": "Incorrect rollback can revert wanted changes."
+      },
+      {
+        "policy": "tool_use_policy.md",
+        "rule_title": "Tool Use Policy",
+        "description": "Using the wrong tool for a task can produce incorrect results."
+      },
+      {
+        "policy": "verification_policy.md",
+        "rule_title": "Verification Policy",
+        "description": "Skipping verification can lead to broken code in production."
+      }
+    ],
+    "Low Risk": [
+      {
+        "policy": "agent_loop_policy.md",
+        "rule_title": "Agent Loop Policy",
+        "description": "Retry limits prevent runaway loops but may cause premature failure."
+      },
+      {
+        "policy": "evidence_logging_policy.md",
+        "rule_title": "Evidence Logging Policy",
+        "description": "Excessive logging can consume resources."
+      },
+      {
+        "policy": "frontend_generation_policy.md",
+        "rule_title": "Frontend Generation Policy",
+        "description": "Accessibility oversights can impact user experience."
+      },
+      {
+        "policy": "progress_reporting_policy.md",
+        "rule_title": "Progress Reporting Policy",
+        "description": "Over-reporting can be annoying; under-reporting can leave users confused."
+      },
+      {
+        "policy": "verification_policy.md",
+        "rule_title": "Verification Policy",
+        "description": "Over-reliance on automated checks may miss logical errors."
+      }
+    ],
+    "High Risk": [
+      {
+        "policy": "coding_agent_policy.md",
+        "rule_title": "Coding Agent Policy",
+        "description": "Editing files without reading them first can corrupt code."
+      },
+      {
+        "policy": "database_safety_policy.md",
+        "rule_title": "Database Safety Policy",
+        "description": "SQL injection can compromise the entire database."
+      },
+      {
+        "policy": "destructive_action_policy.md",
+        "rule_title": "Destructive Action Policy",
+        "description": "Accidental data loss from unapproved deletions."
+      },
+      {
+        "policy": "edit_policy.md",
+        "rule_title": "Edit Policy",
+        "description": "Overlapping edits can corrupt files."
+      },
+      {
+        "policy": "rollback_policy.md",
+        "rule_title": "Rollback Policy",
+        "description": "Inability to rollback can lead to permanent data loss."
+      },
+      {
+        "policy": "secret_handling_policy.md",
+        "rule_title": "Secret Handling Policy",
+        "description": "Accidental logging of secrets in tool calls or errors."
+      },
+      {
+        "policy": "tool_use_policy.md",
+        "rule_title": "Tool Use Policy",
+        "description": "Fabricating tool calls that don't exist causes execution failures."
+      }
+    ],
+    "Critical Risk": [
+      {
+        "policy": "database_safety_policy.md",
+        "rule_title": "Database Safety Policy",
+        "description": "Unauthorized destructive actions can cause irreversible data loss."
+      },
+      {
+        "policy": "destructive_action_policy.md",
+        "rule_title": "Destructive Action Policy",
+        "description": "Unauthorized destructive actions can cause irreversible damage."
+      },
+      {
+        "policy": "secret_handling_policy.md",
+        "rule_title": "Secret Handling Policy",
+        "description": "Secret exposure can lead to unauthorized access and data breaches."
+      }
+    ]
+  },
+  "by_source": {
+    "OpenClaw": [
+      {
+        "policy": "agent_loop_policy.md",
+        "reference": "OpenClaw \"Karpathy Loop\" concept"
+      },
+      {
+        "policy": "coding_agent_policy.md",
+        "reference": "OpenClaw `edit` tool guidelines"
+      },
+      {
+        "policy": "database_safety_policy.md",
+        "reference": "OpenClaw database tool guidelines"
+      },
+      {
+        "policy": "destructive_action_policy.md",
+        "reference": "OpenClaw destructive action guidelines"
+      },
+      {
+        "policy": "edit_policy.md",
+        "reference": "OpenClaw `edit` tool documentation"
+      },
+      {
+        "policy": "evidence_logging_policy.md",
+        "reference": "OpenClaw logging guidelines"
+      },
+      {
+        "policy": "frontend_generation_policy.md",
+        "reference": "OpenClaw frontend generation guidelines"
+      },
+      {
+        "policy": "progress_reporting_policy.md",
+        "reference": "OpenClaw messaging guidelines"
+      },
+      {
+        "policy": "rollback_policy.md",
+        "reference": "OpenClaw rollback and recovery guidelines"
+      },
+      {
+        "policy": "secret_handling_policy.md",
+        "reference": "OpenClaw secret management guidelines"
+      },
+      {
+        "policy": "tool_use_policy.md",
+        "reference": "OpenClaw tool registry"
+      },
+      {
+        "policy": "verification_policy.md",
+        "reference": "OpenClaw verification guidelines"
+      }
+    ],
+    "Industry": [
+      {
+        "policy": "edit_policy.md",
+        "reference": "File system safety guidelines"
+      }
+    ]
+  }
+}

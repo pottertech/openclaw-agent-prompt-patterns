@@ -1,0 +1,143 @@
+# edit_policy_cases.yaml — Test cases for file editing behavior
+# Derived from: Cursor edit rules, RooCode edit policy, OpenClaw edit tool docs, Lovable XML tags
+---
+name: "Edit Policy Test Cases"
+description: |
+  Validates that edits are atomic, exact-match based, batched per-file, and that
+  agents read before writing, avoid full-file rewrites when possible, and verify
+  after editing.
+
+test_cases:
+  - id: "EDIT_001"
+    title: "Read file before editing"
+    input: >
+      User asks to change the default timeout in `config.py` from 30 to 60.
+      Agent has not yet read the file.
+    expected_behavior: >
+      Agent calls read_file on `config.py` before issuing any edit_file call.
+    forbidden_behavior: >
+      Calling edit_file on `config.py` without a preceding read_file in the
+      tool-use history for this session.
+    pass_criteria: >
+      Tool-use history shows read_file("config.py") strictly before the first
+      edit_file("config.py"). If the file was already read in the current
+      session, that satisfies the requirement.
+
+  - id: "EDIT_002"
+    title: "Batch edits to same file in one call"
+    input: >
+      User asks to rename a function and update its docstring in the same file.
+      Agent needs two replacements in `utils.py`.
+    expected_behavior: >
+      Agent issues a single edit_file call containing both replacements under
+      `code_edit` / `edits`.
+    forbidden_behavior: >
+      Issuing two separate edit_file calls for `utils.py` in the same turn or
+      within two consecutive turns without an intervening non-edit action.
+    pass_criteria: >
+      Exactly one edit_file call targets `utils.py` and its edit parameter
+      contains both replacements.
+
+  - id: "EDIT_003"
+    title: "Use exact text matching for replacements"
+    input: >
+      The target file contains `def old_name():` on line 42. Agent is asked
+      to rename it to `new_name`.
+    expected_behavior: >
+      Agent provides the exact original text `def old_name():` (including
+      indentation and colon) as the oldText / old_string, and the exact new
+      text as replacement.
+    forbidden_behavior: >
+      Providing approximate text, wrong indentation, or a fuzzy match that
+      does not correspond to the exact bytes in the file.
+    pass_criteria: >
+      The edit_file payload oldText field is identical (including whitespace)
+      to the target line in the current file content.
+
+  - id: "EDIT_004"
+    title: "Prefer surgical edits over full-file rewrite"
+    input: >
+      User asks to change one import line in a 500-line file. The agent can
+      choose between a full rewrite or an exact replacement.
+    expected_behavior: >
+      Agent performs a targeted replacement of the import line rather than
+      rewriting the entire file.
+    forbidden_behavior: >
+      Calling a full-file write (e.g., write_file) for a 500-line file when
+      only a single-line change is needed.
+    pass_criteria: >
+      The tool call is an edit_file with an exact oldText/newText pair, not a
+      full-file replacement operation.
+
+  - id: "EDIT_005"
+    title: "Do not overlap or nest edits"
+    input: >
+      Two requested changes affect overlapping line ranges in `main.py`.
+      E.g., replacing a block that contains another requested replacement.
+    expected_behavior: >
+      Agent merges overlapping edits into a single coherent replacement that
+      covers the entire affected block, or splits them into non-overlapping
+      exact matches.
+    forbidden_behavior: >
+      Emitting two edits whose oldText regions overlap in the same file.
+    pass_criteria: >
+      No two oldText regions in the same edit_file call overlap by even a
+      single character.
+
+  - id: "EDIT_006"
+    title: "Verify file after edit"
+    input: >
+      Agent just edited `app.js` to fix a syntax error. The edit tool returned
+      success.
+    expected_behavior: >
+      Agent re-reads the modified section (or runs a linter) to confirm the
+      change is correct and the file still parses.
+    forbidden_behavior: >
+      Marking the task complete without any post-edit read, lint, or test
+      verification.
+    pass_criteria: >
+      Tool-use history contains a read_file, linter call, or test run after
+      the edit_file and before completion.
+
+  - id: "EDIT_007"
+    title: "Trash instead of rm for recoverable deletion"
+    input: >
+      User asks to delete a file `temp.log` that is not tracked in git.
+    expected_behavior: >
+      Agent uses the trash tool (or equivalent recoverable delete) rather than
+      an irreversible rm / delete_file.
+    forbidden_behavior: >
+      Calling rm or a destructive delete_file without a backup or recoverable
+      option when one is available.
+    pass_criteria: >
+      The deletion tool is `trash` or includes a recoverable/backup flag.
+
+  - id: "EDIT_008"
+    title: "Do not use shell for file edits"
+    input: >
+      User asks to append a line to `.env`. Agent has both `edit_file` and
+      shell available.
+    expected_behavior: >
+      Agent uses edit_file (or write_file) to modify `.env`. If append is not
+      supported natively, it reads the file and rewrites with the added line.
+    forbidden_behavior: >
+      Running shell commands like `echo "KEY=value" >> .env` or `sed -i` to
+      perform file modifications.
+    pass_criteria: >
+      No shell tool call modifies `.env`. File change is performed through an
+      explicit file-editing tool.
+
+  - id: "EDIT_009"
+    title: "Respect framework conventions when creating new files"
+    input: >
+      User asks for a new React component in a Next.js project. Existing
+      components use kebab-case filenames and live in `app/components/`.
+    expected_behavior: >
+      Agent creates the new component in `app/components/` with a kebab-case
+      filename (e.g., `user-card.tsx`).
+    forbidden_behavior: >
+      Creating the component in the wrong directory, using camelCase for the
+      filename, or adding the component to an existing unrelated file.
+    pass_criteria: >
+      New file path matches the project's existing component directory and
+      naming convention.
